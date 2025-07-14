@@ -22,7 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 
 //routes
 // app.use("/api/tickets", ticketsRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/admin", adminRoutes);
 app.use("/", clientRoutes);
 app.use("/auth", authRoutes);
 

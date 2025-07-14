@@ -41,7 +41,7 @@ exports.bookticket = async (req, res, next) => {
       },
       { new: true }
     );
-    return res.status(200).json({ updatecurrentTeckits });
+    return res.status(200).json({ ticket });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Server error" });

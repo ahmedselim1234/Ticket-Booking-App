@@ -23,6 +23,7 @@ exports.signup = async (req, res, next) => {
       {
         userInfo: {
           id: createUser._id,
+          role: createUser.role
         },
       },
       process.env.ACCESS_TOKEN_SECRET,
@@ -33,6 +34,7 @@ exports.signup = async (req, res, next) => {
       {
         userInfo: {
           id: createUser._id,
+          role: createUser.role
         },
       },
       process.env.REFREESH_TOKEN_SECRET,
@@ -66,6 +68,7 @@ exports.login = async (req, res, next) => {
       {
         userInfo: {
           id: user._id,
+          role: user.role
         },
       },
       process.env.ACCESS_TOKEN_SECRET,
@@ -75,6 +78,7 @@ exports.login = async (req, res, next) => {
       {
         userInfo: {
           id: user._id,
+          role: user.role
         },
       },
       process.env.REFREESH_TOKEN_SECRET,
@@ -110,6 +114,7 @@ exports.refresh = (req, res, next) => {
       {
         userInfo: {
           id: user._id,
+          role: user.role
         },
       },
       process.env.ACCESS_TOKEN_SECRET,
