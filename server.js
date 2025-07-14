@@ -12,6 +12,7 @@ const port = process.env.PORT || 3000;
 // const ticketsRoutes = require("./routes/tickets");
 const adminRoutes = require("./routes/admin");
 const clientRoutes = require("./routes/client");
+const authRoutes = require("./routes/authRoutes");
 
 //middleware
 app.use(cors(corsOptions));
@@ -23,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 // app.use("/api/tickets", ticketsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/", clientRoutes);
+app.use("/auth", authRoutes);
 
 //----------
 connectDB()
