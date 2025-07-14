@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "client"],
       default: 'client'
     },
+    passwordResetCode:String,
+    expireResetCode:Date,
+    verifyResetCode:Boolean,
+
   },
   { timestamps: true }
 );
