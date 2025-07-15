@@ -1,7 +1,7 @@
 TICKET BOOKING API
 ===================
 
-A modular and secure backend API built with Node.js, Express, and MongoDB.
+A modular and secure backend API built with Node.js, Express, and MongoDB.  
 This system manages event ticket bookings and supports two user roles: Admin and Client.
 
 ------------------------
@@ -14,15 +14,14 @@ FEATURES
 - Client can book and cancel tickets.
 - Custom middleware for authentication and authorization.
 - Clean, scalable project structure.
-- Environment configuration via .env.
+- Environment configuration via `.env`.
 - Optional unit testing for components and endpoints.
 
 ------------------------
 PROJECT STRUCTURE
 ------------------------
-ذذذ
+
 ```
-ذذذ
 project-root/
 ├── controllers/             # Business logic
 │   ├── admin.js
@@ -52,6 +51,7 @@ project-root/
 ├── package.json             # Project metadata and scripts
 └── README.md                # Documentation
 ```
+
 ------------------------
 API ENDPOINTS OVERVIEW
 ------------------------
@@ -66,7 +66,6 @@ POST    /auth/forgetpassword        →  Request password reset
 POST    /auth/verifyResetCode       →  Verify password reset code  
 PUT     /auth/addnewpassword        →  Set new password  
 
-
 ADMIN ROUTES
 ------------
 GET     /admin/gettickets           →  Get all tickets  
@@ -78,11 +77,9 @@ PUT     /admin/updateEvent/:id      →  Update event details
 DELETE  /admin/deleteevent/:id      →  Delete event  
 POST    /admin/addevent             →  Create new event  
 
-
 CLIENT ROUTES
 -------------
 GET     /                          →  Get all available events  
 POST    /bookticket                →  Book a ticket  
 DELETE  /deletebook/:id            →  Cancel a booking  
 GET     /getclientTickets/:id      →  Get tickets for a client  
-
