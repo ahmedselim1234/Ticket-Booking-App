@@ -1,14 +1,1 @@
-   "userId":"6873b22eadfa5f96d0c48fb9",
-    "eventId":"6873b227adfa5f96d0c48fb6"
-
-     "email":"ahness97@gmail.com",
-    "password":"aliali1"
-
-
-
-
-admin/getclients
-
-admin/getclients/6874d266a92185a173a6425e
-
-auth/login 
+n 
