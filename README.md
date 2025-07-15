@@ -22,34 +22,33 @@ PROJECT STRUCTURE
 ------------------------
 
 project-root/
-│
-├── controllers/             →  Business logic
+├── controllers/             # Business logic
 │   ├── admin.js
 │   ├── client.js
 │   └── auth.js
 │
-├── routes/                  →  API route definitions
+├── routes/                  # API route definitions
 │   ├── admin.js
 │   ├── client.js
 │   └── authRoutes.js
 │
-├── middleware/              →  Custom middlewares
+├── middleware/              # Custom middleware (auth, roles, errors)
 │   ├── isAuth.js
 │   ├── role.js
 │   └── errorHandler.js
 │
-├── models/                  →  Mongoose schemas (Event, Ticket, User)
+├── models/                  # Mongoose models (event, ticket, user)
 │
-├── config/                  →  App and DB configuration
+├── config/                  # DB and CORS config
 │   ├── dbnonnect.js
 │   └── corsOptions.js
 │
-├── util/                    →  Utility functions (e.g., sendEmail.js)
+├── util/                    # Utility functions (e.g., sendEmail.js)
 │
-├── .env                     →  Environment variables
-├── server.js                →  App entry point
-├── package.json
-└── README.md
+├── .env                     # Environment variables
+├── server.js                # Application entry point
+├── package.json             # Project metadata and scripts
+└── README.md                # Documentation
 
 ------------------------
 API ENDPOINTS OVERVIEW
