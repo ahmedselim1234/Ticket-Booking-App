@@ -15,7 +15,7 @@ FEATURES
 - Custom middleware for authentication and authorization.
 - Clean, scalable project structure.
 - Environment configuration via `.env`.
-- Optional unit testing for components and endpoints.
+- Optional unit testing for components and endpoints
 
 ------------------------
 PROJECT STRUCTURE
