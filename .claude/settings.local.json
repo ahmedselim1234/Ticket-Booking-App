@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('./app'\\); console.log\\('app.js loads OK'\\)\")",
+      "Bash(npx jest *)",
+      "Bash(node -e \"const jest = require\\('jest'\\); console.log\\(Object.keys\\(require\\('jest-config'\\).Defaults\\)\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
