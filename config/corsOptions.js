@@ -1,16 +1,15 @@
-const allowedOrogins = require("./allowedOrigins");
+const allowedOrigins = require("./allowedOrigins");
 
-const corsOPtions={
-    origin:(origin,callback)=>{
-        // (!origin) for test on postman 
-        if(allowedOrogins.indexOf(origin)!==-1 || !origin){
-            callback(null,true)
-        }else {
-            callback(new Error('not allowed by cors'))
-        }
-    },
-    credentials:true,// to send cookies with the request
-    optionsSuccessStatus: 200
-}
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (allowedOrigins.includes(origin) || (!origin && process.env.NODE_ENV !== "production")) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
 
-module.exports=corsOPtions;
+module.exports = corsOptions;

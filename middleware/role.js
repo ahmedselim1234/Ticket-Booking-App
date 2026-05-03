@@ -1,22 +1,10 @@
-// exports.allowRoles = (...allowedRoles) => {
-//   return (req, res, next) => {
-//     if (!req.user?.role || !allowedRoles.includes(req.user.role)) {
-//       return res.status(403).json({ message: "Access Denied" });
-//     }
-//     next();
-//   };
-// };
+const AppError = require("../util/AppError");
 
 exports.allowRoles = (...allowedRoles) => {
   return (req, res, next) => {
-    const role = req.user?.role;
-
-    if (!role || !allowedRoles.includes(role)) {
-      return res.status(403).json({ message: "Access Denied" });
+    if (!req.user?.role || !allowedRoles.includes(req.user.role)) {
+      return next(new AppError("You do not have permission to perform this action", 403));
     }
-
     next();
   };
 };
-
-// module.exports = { allowRoles };

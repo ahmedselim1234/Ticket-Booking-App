@@ -1,22 +1,17 @@
 const jwt = require("jsonwebtoken");
+const AppError = require("../util/AppError");
 
 const requireAuth = (req, res, next) => {
-  const authheader = req.headers.authorization || req.headers.Authorization;
-  if (!authheader?.startsWith("Bearer "))
-    return res.status(401).json({ message: "unAuth" });
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader?.startsWith("Bearer ")) return next(new AppError("Not authenticated", 401));
 
-  const token = authheader.split(" ")[1];
+  const token = authHeader.split(" ")[1];
 
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-    // token exist but not true
-    if (err) {
-      console.log(err);
-      return res.status(403).json({ message: "forbiddennnnnnnn" });
-    }
+    if (err) return next(new AppError("Invalid or expired token", 403));
     req.user = decoded.userInfo;
     next();
   });
 };
- 
-module.exports = { requireAuth };
 
+module.exports = { requireAuth };

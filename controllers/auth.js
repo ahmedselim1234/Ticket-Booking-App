@@ -3,215 +3,183 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const sendEmail = require("../util/sendEmail");
-const { read } = require("fs");
+const AppError = require("../util/AppError");
+const { successResponse, failResponse } = require("../util/response");
+const logger = require("../util/logger");
 
 exports.signup = async (req, res, next) => {
-  const { first_name, email, password } = req.body;
-  if (!first_name || !email || !password)
-    return res.json({ m: "fill all fields" });
-
   try {
-    const user = await User.findOne({ email: email });
-    if (user) return res.json({ m: "this email is already exist" });
+    const { first_name, email, password } = req.body;
 
-    const hashedPass = await bcrypt.hash(password, 10);
+    const existing = await User.findOne({ email });
+    if (existing) return next(new AppError("Email already in use", 409));
 
-    const createUser = await User.create({
-      first_name,
-      email,
-      password: hashedPass,
+    const hashedPass = await bcrypt.hash(password, 12);
+    const user = await User.create({ first_name, email, password: hashedPass });
+
+    const accessToken = _signAccess(user);
+    const refreshToken = _signRefresh(user);
+
+    _setRefreshCookie(res, refreshToken);
+
+    logger.info("New user registered", { userId: user._id });
+    return successResponse(res, 201, "Account created successfully", {
+      accessToken,
+      user: { id: user._id, name: user.first_name, email: user.email, role: user.role },
     });
-
-    const accessToken = jwt.sign(
-      {
-        userInfo: {
-          id: createUser._id,
-          role: createUser.role,
-        },
-      },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "2m" }
-    );
-
-    const refreshToken = jwt.sign(
-      {
-        userInfo: {
-          id: createUser._id,
-          role: createUser.role,
-        },
-      },
-      process.env.REFREESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.cookie("jwt", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
-
-    return res.json({ accessToken, email, password });
   } catch (err) {
-    console.log(err);
+    next(err);
   }
 };
 
 exports.login = async (req, res, next) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.json({ m: "fill all fields" });
-
   try {
-    const user = await User.findOne({ email: email });
-    if (!user) return res.json({ m: "this email is not  exist" });
+    const { email, password } = req.body;
 
-    const comparePassword = await bcrypt.compare(password, user.password);
-    if (!comparePassword) return res.json({ m: "enter a valid password " });
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) return next(new AppError("Invalid email or password", 401));
 
-    const accessToken = jwt.sign(
-      {
-        userInfo: {
-          id: user._id,
-          role: user.role,
-        },
-      },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "2m" }
-    );
-    const refreshToken = jwt.sign(
-      {
-        userInfo: {
-          id: user._id,
-          role: user.role,
-        },
-      },
-      process.env.REFREESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return next(new AppError("Invalid email or password", 401));
 
-    res.cookie("jwt", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+    const accessToken = _signAccess(user);
+    const refreshToken = _signRefresh(user);
+
+    _setRefreshCookie(res, refreshToken);
+
+    logger.info("User logged in", { userId: user._id });
+    return successResponse(res, 200, "Logged in successfully", {
+      accessToken,
+      user: { id: user._id, name: user.first_name, email: user.email, role: user.role },
     });
-
-    return res.json({ accessToken, email, password });
   } catch (err) {
-    console.log(err);
+    next(err);
   }
 };
 
 exports.refresh = (req, res, next) => {
   const token = req.cookies.jwt;
+  if (!token) return next(new AppError("Not authenticated", 401));
 
-  if (!token) return res.json({ m: "un auth" });
+  jwt.verify(token, process.env.REFRESH_TOKEN_SECRET, async (err, decoded) => {
+    if (err) return next(new AppError("Invalid or expired refresh token", 403));
 
-  jwt.verify(token, process.env.REFREESH_TOKEN_SECRET, async (err, decode) => {
-    if (err) return res.json({ m: "forbidden" });
+    try {
+      const user = await User.findById(decoded.userInfo.id);
+      if (!user) return next(new AppError("User no longer exists", 401));
 
-    const user = await User.findById(decode.userInfo.id);
-    console.log(user);
-
-    if (!user) return res.status(401).json({ message: "unAuth" });
-
-    const accessToken = jwt.sign(
-      {
-        userInfo: {
-          id: user._id,
-          role: user.role,
-        },
-      },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "2m" }
-    );
-    res.json({ accessToken });
+      const accessToken = _signAccess(user);
+      return successResponse(res, 200, "Token refreshed", { accessToken });
+    } catch (dbErr) {
+      next(dbErr);
+    }
   });
 };
 
-exports.logout = (req, res, next) => {
-  res.clearCookie("jwt", {
-    HttpOnly: true,
-    sameSite: "none",
-  });
-  res.json({ message: "logged out" });
+exports.logout = (req, res) => {
+  res.clearCookie("jwt", { httpOnly: true, secure: true, sameSite: "strict" });
+  return successResponse(res, 200, "Logged out successfully");
 };
 
 exports.forgetPassword = async (req, res, next) => {
   try {
     const user = await User.findOne({ email: req.body.email });
-    if (!user) return res.json({ m: "this email is not exist" });
+    if (!user) return next(new AppError("No account found with that email", 404));
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const hashedCode = await crypto
-      .createHash("sha256")
-      .update(resetCode)
-      .digest("hex");
+    const hashedCode = crypto.createHash("sha256").update(resetCode).digest("hex");
 
     user.passwordResetCode = hashedCode;
-    user.expireResetCode = Date.now() + 60 * 10 * 1000;
+    user.expireResetCode = Date.now() + 10 * 60 * 1000;
     user.verifyResetCode = false;
-
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
     try {
       await sendEmail({
         email: user.email,
-        subject: "your reset code ",
-        message: `hi ${user.first_name} \n your reset code is \n ${resetCode} `,
+        subject: "Your password reset code (valid for 10 minutes)",
+        message: `Hi ${user.first_name},\n\nYour password reset code is: ${resetCode}\n\nIf you did not request this, please ignore this email.`,
       });
-    } catch (err) {
+    } catch (emailErr) {
       user.passwordResetCode = undefined;
       user.expireResetCode = undefined;
       user.verifyResetCode = undefined;
-      await user.save();
-      res.json({ m: "error when sending email" });
+      await user.save({ validateBeforeSave: false });
+      return next(new AppError("Failed to send reset email. Please try again.", 500));
     }
 
-    res.json({ m: "d" });
+    logger.info("Password reset code sent", { userId: user._id });
+    return successResponse(res, 200, "Reset code sent to your email");
   } catch (err) {
-    console.log(err);
+    next(err);
   }
 };
 
 exports.verifyResetCode = async (req, res, next) => {
-  const { enteredCode } = req.body;
-
   try {
-    const hashedCode = await crypto
-      .createHash("sha256")
-      .update(enteredCode)
-      .digest("hex");
+    const { enteredCode } = req.body;
+    const hashedCode = crypto.createHash("sha256").update(enteredCode).digest("hex");
+
     const user = await User.findOne({
       passwordResetCode: hashedCode,
       expireResetCode: { $gt: Date.now() },
-    });
-    if (!user) return res.json({ m: "code invalid or expired" });
-    user.verifyResetCode = true;
-    console.log(user);
+    }).select("+passwordResetCode +expireResetCode +verifyResetCode");
 
-    await user.save();
-    return res.json({ m: "success" });
+    if (!user) return next(new AppError("Reset code is invalid or has expired", 400));
+
+    user.verifyResetCode = true;
+    await user.save({ validateBeforeSave: false });
+
+    return successResponse(res, 200, "Code verified successfully");
   } catch (err) {
-    console.log(err);
+    next(err);
   }
 };
 
 exports.addNewPassword = async (req, res, next) => {
-  const { email,password } = req.body;
   try {
-    const user = await User.findOne({ email: email }); 
-    if(user.verifyResetCode===false) return res.status(400).json({ m: "enter the reset code " });
-    if (!user) return res.json({ m: "enter valid email" });
-    const hashedPass= await bcrypt.hash(password,10);
-    user.password=hashedPass;
-     user.passwordResetCode = undefined;
-      user.expireResetCode = undefined;
-      user.verifyResetCode = undefined;
-    await user.save();
+    const { email, password } = req.body;
 
+    const user = await User.findOne({ email }).select("+verifyResetCode +passwordResetCode +expireResetCode");
+    if (!user) return next(new AppError("No account found with that email", 404));
+    if (!user.verifyResetCode) return next(new AppError("Please verify your reset code first", 400));
 
-    
-    res.json({m:"password changed successfully"})
+    user.password = await bcrypt.hash(password, 12);
+    user.passwordResetCode = undefined;
+    user.expireResetCode = undefined;
+    user.verifyResetCode = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    logger.info("Password changed", { userId: user._id });
+    return successResponse(res, 200, "Password changed successfully");
   } catch (err) {
-    console.log(err);
+    next(err);
   }
 };
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function _signAccess(user) {
+  return jwt.sign(
+    { userInfo: { id: user._id, role: user.role } },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: "15m" }
+  );
+}
+
+function _signRefresh(user) {
+  return jwt.sign(
+    { userInfo: { id: user._id, role: user.role } },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
+function _setRefreshCookie(res, token) {
+  res.cookie("jwt", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}

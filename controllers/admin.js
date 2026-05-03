@@ -1,103 +1,99 @@
 const Ticket = require("../models/tickets");
-const Client = require("../models/user");
+const User = require("../models/user");
 const Event = require("../models/event");
-
+const AppError = require("../util/AppError");
+const { successResponse } = require("../util/response");
+const logger = require("../util/logger");
 
 exports.getTickets = async (req, res, next) => {
   try {
-    const allTickets = await Ticket.find().exec();
-
-    if (!allTickets || allTickets.length === 0) {
-      return res.status(404).json({ message: "We don't have tickets" });
-    }
-
-    return res.status(200).json({ allTickets });
+    const tickets = await Ticket.find().populate("userId", "first_name email").populate("eventId", "title date");
+    return successResponse(res, 200, "Tickets retrieved successfully", { tickets, count: tickets.length });
   } catch (err) {
-    console.log("Error while fetching tickets:", err);
-    return res.status(500).json({ message: "Server error" });
+    next(err);
+  }
+};
+
+exports.getTicket = async (req, res, next) => {
+  try {
+    const ticket = await Ticket.findById(req.params.id).populate("userId", "first_name email").populate("eventId", "title date price");
+    if (!ticket) return next(new AppError("Ticket not found", 404));
+    return successResponse(res, 200, "Ticket retrieved successfully", { ticket });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getEvents = async (req, res, next) => {
+  try {
+    const events = await Event.find().sort({ date: 1 });
+    return successResponse(res, 200, "Events retrieved successfully", { events, count: events.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getEvent = async (req, res, next) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) return next(new AppError("Event not found", 404));
+    return successResponse(res, 200, "Event retrieved successfully", { event });
+  } catch (err) {
+    next(err);
   }
 };
 
 exports.addEvent = async (req, res, next) => {
-  const { title, place, date, price, maxTeckts, currentTeckits } = req.body;
-  if (!title || !place || !date || !price || !maxTeckts)
-    return res.json({ m: "fill all fields" });
   try {
-    const event = await Event.create({
-      title,
-      place,
-      date,
-      price,
-      maxTeckts,
-      currentTeckits: maxTeckts,
-    });
-    return res.status(200).json({ message: ` event created ${event}` });
+    const { title, place, date, price, maxTickets } = req.body;
+    const event = await Event.create({ title, place, date, price, maxTickets, currentTickets: maxTickets });
+    logger.info("Event created", { eventId: event._id, title });
+    return successResponse(res, 201, "Event created successfully", { event });
   } catch (err) {
-    console.log(err);
-    return res.status(401).json({ message: ` event not  created ` });
+    next(err);
   }
 };
 
 exports.updateEvent = async (req, res, next) => {
-  const { title, place, date, price, maxTeckts, currentTeckits } = req.body;
   try {
-    const specificEvent = await Event.findByIdAndUpdate(req.params.id, {
-      title,
-      place,
-      date,
-      price,
-      maxTeckts,
-      currentTeckits: maxTeckts,
-    });
-     const specificEvent1 = await Event.findById(req.params.id)
-    return res.status(200).json({ message: ` event updated ${specificEvent1}` });
-  } catch (err) {
-    console.log(err);
-    return res.status(401).json({ message: ` event not  updated ` });
-  }
-};
-
-
-exports.getEvents = async (req, res, next) => {
-  try {
-    const allEvents = await Event.find().exec();
-
-    if (!allEvents || allEvents.length === 0) {
-      return res.status(404).json({ message: "We don't have Events" });
+    const { title, place, date, price, maxTickets } = req.body;
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (place !== undefined) updateData.place = place;
+    if (date !== undefined) updateData.date = date;
+    if (price !== undefined) updateData.price = price;
+    if (maxTickets !== undefined) {
+      updateData.maxTickets = maxTickets;
+      updateData.currentTickets = maxTickets;
     }
 
-    return res.status(200).json({ allEvents });
+    const event = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    if (!event) return next(new AppError("Event not found", 404));
+
+    logger.info("Event updated", { eventId: event._id });
+    return successResponse(res, 200, "Event updated successfully", { event });
   } catch (err) {
-    console.log("Error while fetching Events:", err);
-    return res.status(500).json({ message: "Server error" });
+    next(err);
   }
 };
 
-
-exports.getTicket = async (req, res, next) => {
-  const ticket = await Ticket.findById(req.params.id);
-  if (!ticket) return res.status(403).json({ m: "not found ticket " });
-  return res.status(201).json({ ticket: `is  ${ticket}` });
-};
-
-exports.getEvent = async (req, res, next) => {
-  const event = await Event.findById(req.params.id);
-  if (!event) return res.status(403).json({ m: "not found event " });
-  return res.status(201).json({ event: `is  ${event}` });
-};
-
-exports.deleteevent = async (req, res, next) => {
+exports.deleteEvent = async (req, res, next) => {
   try {
-     const event = await Event.findByIdAndDelete(req.params.id);
-       res.status(200).json({ event});
+    const event = await Event.findByIdAndDelete(req.params.id);
+    if (!event) return next(new AppError("Event not found", 404));
+    logger.info("Event deleted", { eventId: req.params.id });
+    return successResponse(res, 200, "Event deleted successfully");
   } catch (err) {
-    console.log(err);
+    next(err);
   }
-
 };
 
 exports.getClients = async (req, res, next) => {
-  const client = await Client.findById(req.params.id);
-  if (!client) return res.status(403).json({ m: "not found clients " });
-  return res.status(201).json({ client: `is  ${client}` });
+  try {
+    const client = await User.findById(req.params.id).select("-password");
+    if (!client) return next(new AppError("Client not found", 404));
+    return successResponse(res, 200, "Client retrieved successfully", { client });
+  } catch (err) {
+    next(err);
+  }
 };

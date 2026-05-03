@@ -1,19 +1,26 @@
 const express = require("express");
-
 const adminController = require("../controllers/admin");
-
-const router = express.Router();
 const { requireAuth } = require("../middleware/isAuth");
 const { allowRoles } = require("../middleware/role");
+const { createEventValidator, updateEventValidator } = require("../middleware/validators/eventValidators");
 
-router.get("/gettickets", requireAuth,allowRoles("admin"), adminController.getTickets);
-router.get("/getevents", adminController.getEvents);
-router.get("/getticket/:id", requireAuth,allowRoles("admin"), adminController.getTicket);
-router.get("/getevent/:id", requireAuth,allowRoles("admin"), adminController.getEvent);
-router.put("/updateEvent/:id", requireAuth,allowRoles("admin"), adminController.updateEvent);
-router.get("/getclients/:id", requireAuth, allowRoles("admin"),adminController.getClients);
+const router = express.Router();
+const adminOnly = [requireAuth, allowRoles("admin")];
 
-router.delete("/deleteevent/:id", requireAuth,allowRoles("admin"), adminController.deleteevent);
-router.post("/addevent", requireAuth,allowRoles("admin"), adminController.addEvent);
+/**
+ * @swagger
+ * tags:
+ *   name: Admin
+ *   description: Admin-only endpoints
+ */
+
+router.get("/gettickets", ...adminOnly, adminController.getTickets);
+router.get("/getticket/:id", ...adminOnly, adminController.getTicket);
+router.get("/getevents", ...adminOnly, adminController.getEvents);
+router.get("/getevent/:id", ...adminOnly, adminController.getEvent);
+router.get("/getclients/:id", ...adminOnly, adminController.getClients);
+router.post("/addevent", ...adminOnly, createEventValidator, adminController.addEvent);
+router.put("/updateEvent/:id", ...adminOnly, updateEventValidator, adminController.updateEvent);
+router.delete("/deleteevent/:id", ...adminOnly, adminController.deleteEvent);
 
 module.exports = router;

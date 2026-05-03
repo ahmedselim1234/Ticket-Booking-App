@@ -1,77 +1,92 @@
-const Events = require("../models/event");
+const mongoose = require("mongoose");
+const Event = require("../models/event");
 const Ticket = require("../models/tickets");
+const AppError = require("../util/AppError");
+const { successResponse } = require("../util/response");
+const logger = require("../util/logger");
+
+const MAX_TICKETS_PER_USER = 5;
 
 exports.getEvents = async (req, res, next) => {
   try {
-    const allEvents = await Events.find().exec();
-
-    if (!allEvents || allEvents.length === 0) {
-      return res.status(404).json({ message: "We don't have Events" });
-    }
-
-    return res.status(200).json({ allEvents });
+    const events = await Event.find({ currentTickets: { $gt: 0 } }).sort({ date: 1 });
+    return successResponse(res, 200, "Events retrieved successfully", { events, count: events.length });
   } catch (err) {
-    console.log("Error while fetching Events:", err);
-    return res.status(500).json({ message: "Server error" });
+    next(err);
   }
 };
 
 exports.bookticket = async (req, res, next) => {
-
-  const { userId, eventId } = req.body;
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const hisTickets = await Ticket.find({ userId: userId });
-    if (hisTickets.length >= 5) return res.status(401).json({ m: "you book maximam teckit =>5" });
-    const event = await Events.findById(eventId);
-    if (event.currentTeckits <= 0)
-      return res.status(401).json({ M: "tickets is finished" });
+    const { userId, eventId } = req.body;
 
-    const ticket = await Ticket.create({
-      userId: userId,
-      eventId: eventId,
-      price: event.price,
-    });
-    // const afterTickets = await Ticket.find({ userId, eventId });
-    // console.log( afterTickets.length);
+    const userTicketCount = await Ticket.countDocuments({ userId }).session(session);
+    if (userTicketCount >= MAX_TICKETS_PER_USER) {
+      await session.abortTransaction();
+      return next(new AppError(`You have reached the maximum booking limit of ${MAX_TICKETS_PER_USER} tickets`, 400));
+    }
 
-    const updatecurrentTeckits = await Events.findByIdAndUpdate(
-      eventId,
-      {
-        $inc: { currentTeckits: -1 },
-      },
-      { new: true }
-    );
-    return res.status(200).json({ ticket });
+    const event = await Event.findById(eventId).session(session);
+    if (!event) {
+      await session.abortTransaction();
+      return next(new AppError("Event not found", 404));
+    }
+    if (event.currentTickets <= 0) {
+      await session.abortTransaction();
+      return next(new AppError("No tickets available for this event", 400));
+    }
+
+    const [ticket] = await Ticket.create([{ userId, eventId, price: event.price }], { session });
+
+    await Event.findByIdAndUpdate(eventId, { $inc: { currentTickets: -1 } }, { session });
+
+    await session.commitTransaction();
+
+    logger.info("Ticket booked", { ticketId: ticket._id, userId, eventId });
+    return successResponse(res, 201, "Ticket booked successfully", { ticket });
   } catch (err) {
-    console.log(err);
-    return res.status(500).json({ message: "Server error" });
+    await session.abortTransaction();
+    next(err);
+  } finally {
+    session.endSession();
   }
 };
 
 exports.deleteBook = async (req, res, next) => {
-  const user = req.params.id;
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const hisTickets = await Ticket.findOneAndDelete({ userId: user });
-    console.log(hisTickets);
-    if (!hisTickets)
-      return res.status(404).json({ message: "you don't have tickets" });
-    return res.status(201).json({ message: "ticket is deleted" });
+    const ticketId = req.params.id;
+
+    const ticket = await Ticket.findById(ticketId).session(session);
+    if (!ticket) {
+      await session.abortTransaction();
+      return next(new AppError("Ticket not found", 404));
+    }
+
+    await Ticket.findByIdAndDelete(ticketId, { session });
+    await Event.findByIdAndUpdate(ticket.eventId, { $inc: { currentTickets: 1 } }, { session });
+
+    await session.commitTransaction();
+
+    logger.info("Ticket cancelled", { ticketId });
+    return successResponse(res, 200, "Ticket cancelled successfully");
   } catch (err) {
-    console.log("Error while fetching Events:", err);
-    return res.status(500).json({ message: "Server error" });
+    await session.abortTransaction();
+    next(err);
+  } finally {
+    session.endSession();
   }
 };
 
 exports.getclientTickets = async (req, res, next) => {
-  const user = req.params.id;
   try {
-    const hisTickets = await Ticket.find({ userId: user });
-    console.log(hisTickets);
-    if (!hisTickets)
-      return res.status(404).json({ message: "you don't have tickets" });
-    return res.status(201).json({ Ticket: hisTickets });
+    const userId = req.params.id;
+    const tickets = await Ticket.find({ userId }).populate("eventId", "title place date price");
+    return successResponse(res, 200, "Tickets retrieved successfully", { tickets, count: tickets.length });
   } catch (err) {
-    console.log("Error while fetching Events:", err);
-    return res.status(500).json({ message: "Server error" });
+    next(err);
   }
 };

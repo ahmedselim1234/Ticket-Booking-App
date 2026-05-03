@@ -1,38 +1,27 @@
 require("dotenv").config();
-const cors = require("cors");
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const connectDB = require("./config/dbnonnect");
-const corsOptions = require("./config/corsOptions");
-const app = express();
-const port = process.env.PORT || 3000;
-//-------------
+const morgan = require("morgan");
+const connectDB = require("./config/dbconnect");
+const logger = require("./util/logger");
+const app = require("./app");
 
-//require routes
-// const ticketsRoutes = require("./routes/tickets");
-const adminRoutes = require("./routes/admin");
-const clientRoutes = require("./routes/client");
-const authRoutes = require("./routes/authRoutes");
+const PORT = process.env.PORT || 5000;
 
-//middleware
-app.use(cors(corsOptions));
-app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(morgan("combined", { stream: { write: (msg) => logger.http(msg.trim()) } }));
 
-//routes
-// app.use("/api/tickets", ticketsRoutes);
-app.use("/admin", adminRoutes);
-app.use("/", clientRoutes);
-app.use("/auth", authRoutes);
-
-//----------
-connectDB()
-  .then(() => {
-    app.listen(port, () => {
-      console.log("server is running");
-    });
-  })
-  .catch((err) => {
-    console.log("cannot connect to db", err);
+connectDB().then(() => {
+  const server = app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
+    logger.info(`API docs available at http://localhost:${PORT}/api-docs`);
   });
+
+  const shutdown = (signal) => {
+    logger.info(`${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+      logger.info("HTTP server closed");
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+});

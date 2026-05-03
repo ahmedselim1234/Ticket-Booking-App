@@ -4,27 +4,33 @@ const EventSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, "title is required"],
+      required: [true, "Title is required"],
+      trim: true,
     },
     place: {
       type: String,
-      required: [true, "place is required"],
+      required: [true, "Place is required"],
+      trim: true,
     },
     date: {
       type: Date,
-      required: [true, "date is required"],
+      required: [true, "Date is required"],
+      index: true,
     },
     price: {
       type: Number,
-      required: [true, "price is required"],
+      required: [true, "Price is required"],
+      min: [0, "Price cannot be negative"],
     },
-    maxTeckts: {
+    maxTickets: {
       type: Number,
-      required: [true, "maxTeckits is required"],
+      required: [true, "Max tickets is required"],
+      min: [1, "Max tickets must be at least 1"],
     },
-    currentTeckits: {
+    currentTickets: {
       type: Number,
-     required: [true, "currentTeckits is required"],
+      required: [true, "Current tickets count is required"],
+      min: [0, "Current tickets cannot be negative"],
     },
   },
   { timestamps: true }
